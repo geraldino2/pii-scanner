@@ -6,29 +6,10 @@ from burp import IBurpExtenderCallbacks
 from burp import ITab
 from java.io import PrintWriter
 from collections import defaultdict
-from javax.swing import JPanel, JLabel, JList, JScrollPane, DefaultListModel, BoxLayout
+from javax.swing import JPanel, JLabel, JList, JScrollPane, BoxLayout
+from core.piiscanner import PIIScanner
 
-class PIIScanner:
-    def __init__(self):
-        pass
-
-    def treatResponse(self, body, source, cookies, headers):
-        with open("results.txt","w") as f:
-            f.write(body.encode('ascii', 'ignore')+"\n")
-            f.write(source+"\n")
-            for cookie in cookies:
-               f.write(cookie+":")
-               for value in cookies[cookie]:
-                   f.write(value+",")
-               f.write("\n")
-            for header in headers:
-                _issues.addElement(header)
-                f.write(header+"\n")
-
-
-EXT_NAME = "PII Scanner"
 CONSUMER = PIIScanner()
-_issues = DefaultListModel()
 
 class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionStateListener, ITab):
     def __init__(self):
@@ -39,7 +20,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
     def defineMetadata(self):
         # type: () -> None
         """Defines metadata used by Burp (extension name)"""
-        self._callbacks.setExtensionName(EXT_NAME)
+        self._callbacks.setExtensionName(self.consumer.EXT_NAME)
 
     def registerListeners(self):
         # type: () -> None
@@ -73,12 +54,12 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
     
     def defineUI(self):
         # type: () -> None
-        """Define all the UI for the extension tab"""
+        """Defines all the UI for the extension tab. UI consists basically of
+        a JList containing items from the global variable _issues."""
         self._main_panel = JPanel()
         self._main_panel.setLayout(BoxLayout(self._main_panel, BoxLayout.Y_AXIS))
         self._main_panel.add(JLabel("Issue list"))
-        self._issues = JList(_issues)
-        self._scroll_pane = JScrollPane(self._issues)
+        self._scroll_pane = JScrollPane(JList(self.consumer._issues))
         self._main_panel.add(self._scroll_pane)
 
         self._callbacks.addSuiteTab(self)
@@ -86,7 +67,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
     def getTabCaption(self):
         # type: () -> str
         """Defined in ITab. Defines tab caption."""
-        return EXT_NAME
+        return self.consumer.EXT_NAME
 
     def getUiComponent(self):
         # type: () -> java.awt.Component
