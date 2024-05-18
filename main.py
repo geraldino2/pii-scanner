@@ -4,10 +4,10 @@ from burp import IProxyListener
 from burp import IExtensionStateListener
 from burp import IBurpExtenderCallbacks
 from burp import ITab
-from java.io import PrintWriter
-from collections import defaultdict
-from javax.swing import JPanel, JLabel, JList, JScrollPane, BoxLayout
 from core.piiscanner import PIIScanner
+from collections import defaultdict
+from java.io import PrintWriter
+from javax.swing import JPanel, JLabel, JList, JScrollPane, BoxLayout
 
 CONSUMER = PIIScanner()
 
@@ -38,7 +38,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         Defined in IBurpExtenderCallbacks, invoked on load.
         - Stores the callbacks object, an instance of IExtensionHelpers and
         a stdout writer
-        - Register itself as a listener for specific Burp defined events
+        - Registers itself as a listener for specific Burp defined events
         - Defines metadata
         - Defines UI
         """
@@ -54,10 +54,14 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
     
     def defineUI(self):
         # type: () -> None
-        """Defines all the UI for the extension tab. UI consists basically of
-        a JList containing items from the global variable _issues."""
+        """
+        Defines the UI for the extension tab. UI consists basically of a 
+        JList containing items from the consumer variable _issues.
+        """
         self._main_panel = JPanel()
-        self._main_panel.setLayout(BoxLayout(self._main_panel, BoxLayout.Y_AXIS))
+        self._main_panel.setLayout(
+            BoxLayout(self._main_panel, BoxLayout.Y_AXIS)
+        )
         self._main_panel.add(JLabel("Issue list"))
         self._scroll_pane = JScrollPane(JList(self.consumer._issues))
         self._main_panel.add(self._scroll_pane)
@@ -82,24 +86,22 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
             cookies[rawCookie.getName()].add(rawCookie.getValue())
         return dict(cookies)
 
-    def parseMessageInfo(self, messageInfo, toolFlag):
-        # type: (IHttpRequestResponse, int) -> Tuple[str, str, Dict[str, Set[str]], List[str]]
-        """
-        Parses a messageInfo object (IHttpRequestResponse) into a tuple:
-        - body content
-        - source (as a constant from burp.IBurpExtenderCallbacks)
-        - parsed cookies
-        - list of headers
-        """
+    def parseResponseMessageInfo(self, messageInfo, toolFlag = IBurpExtenderCallbacks.TOOL_PROXY):
+        # type: (IHttpRequestResponse, int) -> Tuple[str, str, str, int, str, Dict[str, Set[str]], List[str]]
+        """Parses a messageInfo object into multiple text fields"""
         httpResponse = messageInfo.getResponse()
         parsedResponse = self._helpers.analyzeResponse(httpResponse)
+        requestInfo = self._helpers.analyzeRequest(messageInfo)
 
+        source = self._callbacks.getToolName(toolFlag)
+        method = requestInfo.getMethod()
+        url = str(requestInfo.getUrl()) # getUrl returns a java.net.URL object
+        status = parsedResponse.getStatusCode()
         bodyOffset = parsedResponse.getBodyOffset()
         body = self._helpers.bytesToString(httpResponse[bodyOffset:])
-        source = self._callbacks.getToolName(toolFlag)
         cookies = self.parseCookies(parsedResponse.getCookies())
         headers = parsedResponse.getHeaders()
-        return body, source, cookies, headers
+        return source, method, url, status, body, cookies, headers
 
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
         # type: (int, boolean, IHttpRequestResponse) -> None
@@ -112,7 +114,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
             pass
         else:
             self.consumer.treatResponse(
-                *self.parseMessageInfo(
+                *self.parseResponseMessageInfo(
                     messageInfo,
                     toolFlag
                 )
@@ -130,10 +132,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         else:
             messageInfo = message.getMessageInfo()
             self.consumer.treatResponse(
-                *self.parseMessageInfo(
-                    messageInfo,
-                    IBurpExtenderCallbacks.TOOL_PROXY
-                )
+                *self.parseResponseMessageInfo(messageInfo)
             )
 
     def extensionUnloaded(self):
