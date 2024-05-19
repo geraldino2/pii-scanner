@@ -85,17 +85,36 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         for rawCookie in rawCookieArr:
             cookies[rawCookie.getName()].add(rawCookie.getValue())
         return dict(cookies)
+    
+    def parseParameters(self, rawParametersArr):
+        # type: (List[IParameter]) -> Dict[str, Set[str]]
+        """Converts an array of params into a dict mapping names to values"""
+        params = defaultdict(set)
+        for rawParameter in rawParametersArr:
+            params[rawParameter.getName()].add(rawParameter.getValue())
+        return dict(params)
+
+    def parseRequestMessageInfo(self, messageInfo, toolFlag = IBurpExtenderCallbacks.TOOL_PROXY):
+        # type: (IHttpRequestResponse, int) -> Tuple[str, str, str, Dict[str, Set[str]]]
+        """Parses a messageInfo object into multiple text fields"""
+        requestInfo = self._helpers.analyzeRequest(messageInfo)
+
+        source = self._callbacks.getToolName(toolFlag)
+        method = requestInfo.getMethod()
+        url = str(requestInfo.getUrl()) # getUrl returns a java.net.URL object
+        parameters = self.parseParameters(requestInfo.getParameters())
+        return source, method, url, parameters
 
     def parseResponseMessageInfo(self, messageInfo, toolFlag = IBurpExtenderCallbacks.TOOL_PROXY):
         # type: (IHttpRequestResponse, int) -> Tuple[str, str, str, int, str, Dict[str, Set[str]], List[str]]
         """Parses a messageInfo object into multiple text fields"""
         httpResponse = messageInfo.getResponse()
         parsedResponse = self._helpers.analyzeResponse(httpResponse)
-        requestInfo = self._helpers.analyzeRequest(messageInfo)
+        
+        requestInfo = self.parseRequestMessageInfo(messageInfo)
+        _, method, url, _ = requestInfo
 
         source = self._callbacks.getToolName(toolFlag)
-        method = requestInfo.getMethod()
-        url = str(requestInfo.getUrl()) # getUrl returns a java.net.URL object
         status = parsedResponse.getStatusCode()
         bodyOffset = parsedResponse.getBodyOffset()
         body = self._helpers.bytesToString(httpResponse[bodyOffset:])
@@ -111,7 +130,12 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         a response and forwards it to a consumer. 
         """
         if messageIsRequest:
-            pass
+            self.consumer.treatRequest(
+                *self.parseRequestMessageInfo(
+                    messageInfo,
+                    toolFlag
+                )
+            )
         else:
             self.consumer.treatResponse(
                 *self.parseResponseMessageInfo(
@@ -128,7 +152,12 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         and forwards it to a consumer. 
         """
         if messageIsRequest:
-            pass
+            self.consumer.treatRequest(
+                *self.parseRequestMessageInfo(
+                    messageInfo,
+                    toolFlag
+                )
+            )
         else:
             messageInfo = message.getMessageInfo()
             self.consumer.treatResponse(

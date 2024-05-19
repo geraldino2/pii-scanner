@@ -18,6 +18,11 @@ class PIIScanner:
         if(issue not in self.issues):
             self.issues.add(issue)
             self._issues.addElement(issue)
+    
+    def treatRequest(self, *args, **kwargs):
+        # type: (Tuple[Optional[str], Optional[str]]) -> None
+        """Invoked when any response is intercepted by Burp, but useless here"""
+        pass
 
     def treatResponse(self, source, method, url, status, body, cookies, headers):
         # type: (Tuple[str, str, str, int, str, Dict[str, Set[str]], List[str]]) -> None
