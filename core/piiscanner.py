@@ -12,7 +12,7 @@ class PIIScanner:
         self.MATCHERS = [CPFScanner()]
 
     def createIssue(self, matcherType, pii, url):
-        # type: (Tuple[str, str, str]) -> None
+        # type: (str, str, str) -> None
         """Creates an issue in the UI if it is a new one"""
         issue = "[{}] {} (at {})".format(matcherType, pii, url)
         if(issue not in self.issues):
@@ -20,12 +20,12 @@ class PIIScanner:
             self._issues.addElement(issue)
     
     def treatRequest(self, *args, **kwargs):
-        # type: (Tuple[Optional[str], Optional[str]]) -> None
+        # type: (Optional[str], Optional[str]) -> None
         """Invoked when any response is intercepted by Burp, but useless here"""
         pass
 
     def treatResponse(self, source, method, url, status, body, cookies, headers):
-        # type: (Tuple[str, str, str, int, str, Dict[str, Set[str]], List[str]]) -> None
+        # type: (str, str, str, int, str, Dict[str, Set[str]], List[str]) -> None
         """
         Invoked when any response is intercepted by Burp. Finds PII using the 
         matchers defined in self.MATCHERS and creates an issue for each of

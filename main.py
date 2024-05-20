@@ -5,6 +5,7 @@ from burp import IExtensionStateListener
 from burp import IBurpExtenderCallbacks
 from burp import ITab
 from core.piiscanner import PIIScanner
+from core.parser import Parser
 from collections import defaultdict
 from java.io import PrintWriter
 from javax.swing import JPanel, JLabel, JList, JScrollPane, BoxLayout
@@ -45,6 +46,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         self._callbacks = callbacks
         self._helpers = callbacks.getHelpers()
         self._stdout = PrintWriter(callbacks.getStdout(), True)
+        self.parser = Parser(callbacks=self._callbacks, helpers=self._helpers)
         
         self.registerListeners()
 
@@ -78,50 +80,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         """Defined in ITab. Defines the main UI component for the tab."""
         return self._main_panel
 
-    def parseCookies(self, rawCookieArr):
-        # type: (List[ICookie]) -> Dict[str, Set[str]]
-        """Converts an array of cookies into a dict mapping names to values"""
-        cookies = defaultdict(set)
-        for rawCookie in rawCookieArr:
-            cookies[rawCookie.getName()].add(rawCookie.getValue())
-        return dict(cookies)
-    
-    def parseParameters(self, rawParametersArr):
-        # type: (List[IParameter]) -> Dict[str, Set[str]]
-        """Converts an array of params into a dict mapping names to values"""
-        params = defaultdict(set)
-        for rawParameter in rawParametersArr:
-            params[rawParameter.getName()].add(rawParameter.getValue())
-        return dict(params)
-
-    def parseRequestMessageInfo(self, messageInfo, toolFlag = IBurpExtenderCallbacks.TOOL_PROXY):
-        # type: (IHttpRequestResponse, int) -> Tuple[str, str, str, Dict[str, Set[str]]]
-        """Parses a messageInfo object into multiple text fields"""
-        requestInfo = self._helpers.analyzeRequest(messageInfo)
-
-        source = self._callbacks.getToolName(toolFlag)
-        method = requestInfo.getMethod()
-        url = str(requestInfo.getUrl()) # getUrl returns a java.net.URL object
-        parameters = self.parseParameters(requestInfo.getParameters())
-        return source, method, url, parameters
-
-    def parseResponseMessageInfo(self, messageInfo, toolFlag = IBurpExtenderCallbacks.TOOL_PROXY):
-        # type: (IHttpRequestResponse, int) -> Tuple[str, str, str, int, str, Dict[str, Set[str]], List[str]]
-        """Parses a messageInfo object into multiple text fields"""
-        httpResponse = messageInfo.getResponse()
-        parsedResponse = self._helpers.analyzeResponse(httpResponse)
-        
-        requestInfo = self.parseRequestMessageInfo(messageInfo)
-        _, method, url, _ = requestInfo
-
-        source = self._callbacks.getToolName(toolFlag)
-        status = parsedResponse.getStatusCode()
-        bodyOffset = parsedResponse.getBodyOffset()
-        body = self._helpers.bytesToString(httpResponse[bodyOffset:])
-        cookies = self.parseCookies(parsedResponse.getCookies())
-        headers = parsedResponse.getHeaders()
-        return source, method, url, status, body, cookies, headers
-
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
         # type: (int, boolean, IHttpRequestResponse) -> None
         """
@@ -131,14 +89,14 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         """
         if messageIsRequest:
             self.consumer.treatRequest(
-                *self.parseRequestMessageInfo(
+                *self.parser.parseRequestMessageInfo(
                     messageInfo,
                     toolFlag
                 )
             )
         else:
             self.consumer.treatResponse(
-                *self.parseResponseMessageInfo(
+                *self.parser.parseResponseMessageInfo(
                     messageInfo,
                     toolFlag
                 )
@@ -148,20 +106,19 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         # type: (boolean, IInterceptedProxyMessage) -> None
         """
         Defined in IProxyListener, invoked with proxy traffic.
-        Process traffic from proxy, parses the message if it is a response
-        and forwards it to a consumer. 
+        Process traffic from proxy, parses the message and forwards it to a 
+        consumer. 
         """
         if messageIsRequest:
             self.consumer.treatRequest(
-                *self.parseRequestMessageInfo(
-                    messageInfo,
-                    toolFlag
+                *self.parser.parseRequestMessageInfo(
+                    message.getMessageInfo()
                 )
             )
         else:
             messageInfo = message.getMessageInfo()
             self.consumer.treatResponse(
-                *self.parseResponseMessageInfo(messageInfo)
+                *self.parser.parseResponseMessageInfo(messageInfo)
             )
 
     def extensionUnloaded(self):
