@@ -1,5 +1,5 @@
 from javax.swing import DefaultListModel
-from textutils import findBase64Words, findJwts, normalizeString
+from textutils import findCpfBase64Words, findCpfJwts, normalizeString
 from cpfscanner import CPFScanner
 from threading import Lock
 
@@ -30,7 +30,16 @@ class PIIScanner:
         """Invoked when any response is intercepted by Burp, but useless here"""
         pass
 
-    def treatResponse(self, source, method, url, status, body, cookies, headers):
+    def treatResponse(
+        self,
+        source="",
+        method="",
+        url="",
+        status="",
+        body="",
+        cookies=dict(),
+        headers=list(),
+    ):
         # type: (str, str, str, int, str, Dict[str, Set[str]], List[str]) -> None
         """
         Invoked when any response is intercepted by Burp. Finds PII using the
@@ -45,9 +54,9 @@ class PIIScanner:
         headersStr = " ".join(headers)
         text = normalizeString(body + " " + cookiesStr + " " + headersStr)
         if self._regexJwtCheckbox.isSelected():
-            text += " " + " ".join(findJwts(text))
+            text += " " + " ".join(findCpfJwts(text))
         if self._regexBase64Checkbox.isSelected():
-            text += " " + " ".join(findBase64Words(text))
+            text += " " + " ".join(findCpfBase64Words(text))
         for matcher in self.MATCHERS:
             for pii in matcher.find(text):
                 self.createIssue(matcher.type, pii, url)
