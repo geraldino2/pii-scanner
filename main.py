@@ -4,19 +4,27 @@ from burp import IProxyListener
 from burp import IExtensionStateListener
 from burp import IBurpExtenderCallbacks
 from burp import ITab
+from java.io import PrintWriter
+from javax.swing import JPanel, JLabel, JList, JScrollPane, BoxLayout, JCheckBox
 from core.piiscanner import PIIScanner
 from core.parser import Parser
 from collections import defaultdict
-from java.io import PrintWriter
-from javax.swing import JPanel, JLabel, JList, JScrollPane, BoxLayout
 
-CONSUMER = PIIScanner()
 
-class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionStateListener, ITab):
+class BurpExtender(
+    IBurpExtender, IHttpListener, IProxyListener, IExtensionStateListener, ITab
+):
     def __init__(self):
         # type: () -> None
         """Defines config"""
-        self.consumer = CONSUMER
+        self._regexLookaheadCheckbox = JCheckBox("Use RegEx lookahead for matching")
+        self._regexJwtCheckbox = JCheckBox("Use RegEx for matching JWT")
+        self._regexBase64Checkbox = JCheckBox("Use RegEx for matching Base64")
+        self.consumer = PIIScanner(
+            self._regexLookaheadCheckbox,
+            self._regexJwtCheckbox,
+            self._regexBase64Checkbox,
+        )
 
     def defineMetadata(self):
         # type: () -> None
@@ -26,14 +34,14 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
     def registerListeners(self):
         # type: () -> None
         """
-        Registers itself as a listener for IHttpListener, IProxyListener, 
+        Registers itself as a listener for IHttpListener, IProxyListener,
         IExtensionStateListener
         """
         self._callbacks.registerHttpListener(self)
         self._callbacks.registerProxyListener(self)
         self._callbacks.registerExtensionStateListener(self)
 
-    def	registerExtenderCallbacks(self, callbacks):
+    def registerExtenderCallbacks(self, callbacks):
         # type: (IBurpExtenderCallbacks) -> None
         """
         Defined in IBurpExtenderCallbacks, invoked on load.
@@ -47,23 +55,24 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         self._helpers = callbacks.getHelpers()
         self._stdout = PrintWriter(callbacks.getStdout(), True)
         self.parser = Parser(callbacks=self._callbacks, helpers=self._helpers)
-        
+
         self.registerListeners()
 
         self.defineMetadata()
 
         self.defineUI()
-    
+
     def defineUI(self):
         # type: () -> None
         """
-        Defines the UI for the extension tab. UI consists basically of a 
+        Defines the UI for the extension tab. UI consists basically of a
         JList containing items from the consumer variable _issues.
         """
         self._main_panel = JPanel()
-        self._main_panel.setLayout(
-            BoxLayout(self._main_panel, BoxLayout.Y_AXIS)
-        )
+        self._main_panel.setLayout(BoxLayout(self._main_panel, BoxLayout.Y_AXIS))
+        self._main_panel.add(self._regexLookaheadCheckbox)
+        self._main_panel.add(self._regexJwtCheckbox)
+        self._main_panel.add(self._regexBase64Checkbox)
         self._main_panel.add(JLabel("Issue list"))
         self._scroll_pane = JScrollPane(JList(self.consumer._issues))
         self._main_panel.add(self._scroll_pane)
@@ -76,7 +85,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         return self.consumer.EXT_NAME
 
     def getUiComponent(self):
-        # type: () -> java.awt.Component
+        # type: () -> Component
         """Defined in ITab. Defines the main UI component for the tab."""
         return self._main_panel
 
@@ -84,36 +93,28 @@ class BurpExtender(IBurpExtender, IHttpListener, IProxyListener, IExtensionState
         # type: (int, boolean, IHttpRequestResponse) -> None
         """
         Defined in IHttpListener, invoked with HTTP traffic outside proxy.
-        Process traffic from general HTTP listener, parses the message if it is 
-        a response and forwards it to a consumer. 
+        Process traffic from general HTTP listener, parses the message if it is
+        a response and forwards it to a consumer.
         """
         if messageIsRequest:
             self.consumer.treatRequest(
-                *self.parser.parseRequestMessageInfo(
-                    messageInfo,
-                    toolFlag
-                )
+                *self.parser.parseRequestMessageInfo(messageInfo, toolFlag)
             )
         else:
             self.consumer.treatResponse(
-                *self.parser.parseResponseMessageInfo(
-                    messageInfo,
-                    toolFlag
-                )
+                *self.parser.parseResponseMessageInfo(messageInfo, toolFlag)
             )
 
     def processProxyMessage(self, messageIsRequest, message):
         # type: (boolean, IInterceptedProxyMessage) -> None
         """
         Defined in IProxyListener, invoked with proxy traffic.
-        Process traffic from proxy, parses the message and forwards it to a 
-        consumer. 
+        Process traffic from proxy, parses the message and forwards it to a
+        consumer.
         """
         if messageIsRequest:
             self.consumer.treatRequest(
-                *self.parser.parseRequestMessageInfo(
-                    message.getMessageInfo()
-                )
+                *self.parser.parseRequestMessageInfo(message.getMessageInfo())
             )
         else:
             messageInfo = message.getMessageInfo()

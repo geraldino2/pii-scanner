@@ -4,6 +4,7 @@ from collections import defaultdict, namedtuple
 
 class Parser:
     def __init__(self, helpers, callbacks):
+        # type: (IBurpExtenderCallbacks, IExtensionHelpers) -> None
         """Defines internal config"""
         self._helpers = helpers
         self._callbacks = callbacks
