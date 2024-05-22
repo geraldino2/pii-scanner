@@ -7,7 +7,7 @@ PII Scanner is a Burp Suite extension that parses all responses received and loo
 - Supports RegExp lookaheads (optional: impacts perfomance).
 
 ## PoC
-Check [media/README.md](media/README.md) for usage instructions.
+Check [usage/README.md](usage/README.md) for usage instructions.
 - [Valid CPF](http://i.geraldino2.com/dr?status=200&body=12345678909)
 - [Valid CPF using RegExp lookahead](http://i.geraldino2.com/dr?status=200&body=000000000000012345678909)
 - [Base64 CPF](http://i.geraldino2.com/dr?status=200&body=MTIzNDU2Nzg5MDkK)
