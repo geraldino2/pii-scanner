@@ -20,7 +20,7 @@ The defined code structure is pretty simple. `main.py` implements `BurpExtender`
 
 Additional documentation is available [here](docs.md).
 
-![image](https://github.com/geraldino2/pii-scanner/assets/70358808/c478f163-a0e0-4a49-9cbe-3f038e7f5fad)
+![image](codestructure.png)
 
 ## Testing
 Testing is quite complex as extensions use Jython (Python 2) and dependencies from both Java and Burp are required, but is possible and some unit tests were createad using `unittest`. As `unittest` doesn't have mock in Python2, it should be installed from `pip`, through Jython.
